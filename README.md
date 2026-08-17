@@ -4,6 +4,8 @@ Language-tasked pick-and-place for the [SO-101](https://github.com/TheRobotStudi
 
 Say *"move A3 to C5"*. The arm lifts the vial out of one well of a rack and puts it in another. When it fumbles it notices, retreats and retries; if it is still stuck, it shows you the camera frame and asks.
 
+**Start here: [RUNBOOK.md](RUNBOOK.md)** — leader arm to trained policy, step by step.
+
 ## What's here
 
 | file | does |
