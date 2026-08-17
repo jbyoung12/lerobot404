@@ -33,8 +33,32 @@ names the one that disappeared. Plug it back in. Expect something like
   --teleop.type=so101_leader --teleop.port=$PORT --teleop.id=so101_leader
 ```
 
-Walks each joint to both extremes. Until this is done the numbers off the arm
-are raw servo ticks and mean nothing.
+Two prompts, and both matter:
+
+1. **"Move to the middle of its range of motion"** — a neutral posture, roughly
+   halfway on every joint. This sets where zero is.
+2. **"Move all joints through their entire ranges"** — sweep each joint from one
+   hard stop to the other, one at a time, including squeezing the trigger fully
+   closed and fully open.
+
+**Check the table it prints.** Servo ticks run 0–4095 for a full turn, about 11
+per degree, so each joint's MIN..MAX spread should be **hundreds to a couple of
+thousand** ticks:
+
+```
+NAME            |    MIN |    POS |    MAX
+shoulder_pan    |   1973 |   1974 |   2051     ← 78 ticks ≈ 7°. Far too small.
+gripper         |   2039 |   2041 |   2056     ← 17 ticks. Barely moved.
+```
+
+A spread that small gets stretched across the joint's whole output range, so a
+centimetre of hand movement becomes a wild sim swing and anything outside the
+window clamps. If the numbers look like the above, run it again and sweep
+harder.
+
+Calibration is **per physical arm** — offsets differ between units, so one
+arm's file on another reads roughly 90° out and pins the sim arm against its
+limits.
 
 ## 4. STOP — confirm the arm reads
 
@@ -49,7 +73,25 @@ If they do not move, stop here. The problem is the arm, its power, or the
 calibration — nothing downstream can work, and going further wastes the time
 you have left.
 
-## 5. Drive the simulator
+## 5. Open the port tunnel
+
+```bash
+.venv/bin/antioch services up
+```
+
+Its own step, and easy to miss. A scenario dispatch starts the services but
+does **not** open the local port; only `services up` does. It prints the
+tunnel it established:
+
+```
+TUNNEL          TARGET
+localhost:8765  sim:8765 (teleop)
+```
+
+Without this the bridge reports `nothing is listening on http://localhost:8765`
+and nothing you do in the other terminals will fix it.
+
+## 6. Drive the simulator
 
 Two terminals.
 
@@ -74,7 +116,7 @@ Move the leader. The sim arm follows. Check two things before recording:
 **Controls:** `Enter` starts recording an episode, `Enter` again ends it, `q`
 finishes the session and writes the archive.
 
-## 6. STOP — record ONE episode and verify it
+## 7. STOP — record ONE episode and verify it
 
 One pick-and-place. Enter, drive, Enter, `q`. Then:
 
@@ -91,7 +133,7 @@ looks like broken hardware for hours before anyone suspects the labels.
 
 Do not record twenty-five episodes until this one converts clean.
 
-## 7. Record the rest
+## 8. Record the rest
 
 Same session, `Enter`/`Enter` per episode, about 25 in total.
 
@@ -102,7 +144,7 @@ retry possible — a retry begins from a pose that is not the standard one.
 Throw away your first three or four. Teleop feels clumsy until your hand adapts
 to the lag; those episodes teach the policy your flailing.
 
-## 8. Convert and start training
+## 9. Convert and start training
 
 ```bash
 .venv/bin/antioch scenario download <run-id> --artifact episodes.npz -o episodes.npz
@@ -119,7 +161,7 @@ Set `n_action_steps` explicitly. ACT's default executes all 100 predicted
 actions before looking at the camera again; at 10 Hz that is ten seconds flown
 blind. Twenty gives it two seconds, then a fresh look.
 
-## 9. While it trains — build the other three layers
+## 10. While it trains — build the other three layers
 
 None of these need a GPU or the simulator. `import sim` on a laptop picks the
 mock backend, which lags like a real drive and refuses to close its gripper on
@@ -136,7 +178,7 @@ about **2.5°** short of its command; an empty grasp reaches it exactly.
 **Planner and tracker** — `sim.occupancy()` returns which vial is in which well,
 so "move A3 to C5" becomes a sequence of the one trained skill.
 
-## 10. Integrate
+## 11. Integrate
 
 Move the checkpoint to the GPU machine, then swap one call:
 
@@ -148,7 +190,7 @@ for action in chunk[:20]:
 
 Nothing else changes. Scene, camera, scoring and the monitor signal already work.
 
-## 11. Evaluate
+## 12. Evaluate
 
 About 20 episodes on `sim.reset("eval", ...)` — positions the policy has never
 seen — three times: policy alone, plus retry, plus handoff. `sim.score()` counts
@@ -165,6 +207,8 @@ stepped in.
 | Numbers do not move in `--dry-run` | Not calibrated, or the arm is on a different port |
 | Sim arm mirrors your hand | Sign flip in `LEADER_SIGNS`, `src/sim.py` |
 | Trigger opens instead of closing | Same, last entry |
-| Bridge says nothing is listening | Start the `teleop_record` scenario first |
+| Bridge says nothing is listening | Run `antioch services up` — the tunnel is its own step |
+| Sim arm pinned, cannot reach the table | Calibration is from a different arm, or the sweep was too small |
+| Sim arm twitches wildly | Calibration ranges too narrow; sweep each joint to both hard stops |
 | Policy reaches, grasps, then freezes | Actions were recorded as measured states. Re-record. |
 | Policy ignores the vial's position | Trained without the camera, or on episodes all from one position |

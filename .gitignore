@@ -5,3 +5,11 @@
 __pycache__/
 .mypy_cache/
 .pytest_cache/
+
+# Recordings: large, and specific to one session
+*.npz
+
+# Calibration is per physical arm. Committing one arm's file and using it on
+# another produced joint angles ~90 degrees out, which pinned the sim arm
+# against its limits and looked like a software bug for an hour.
+*_arm.json
